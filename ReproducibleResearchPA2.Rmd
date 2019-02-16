@@ -1,0 +1,50 @@
+---
+title: "Reproduceable Research PA2"
+author: "Scott Dayer"
+date: "February 8, 2019"
+output: html_document
+---
+
+## SYNOPSIS
+
+[10 sentence summary of my analysis here]
+
+
+
+```{r, cache = TRUE}
+
+library(tidyverse)
+library(lubridate)
+
+#download data in a tibble
+
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+setwd("C:/Users/207014104/Desktop/DataScience/Reproduceable Research/Project2")
+
+filename <- "stormData.csv.bz2"
+
+if (!file.exists(filename)){
+        url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+        
+        download.file(url, filename)
+}
+
+stormData <- as_tibble(read.csv(filename, stringsAsFactors = FALSE))
+
+```
+
+
+## Data Processing
+
+```{r}
+
+stormData$BGN_DATE <- as.Date(stormData$BGN_DATE, "%m/%d/%Y")
+stormData$BGN_TIME <- format(strptime(stormData$BGN_TIME, format="%H%M"), format = "%H:%M")
+
+
+#stormData <- mutate(stormData, dateTime = ymd_hm(paste(stormData$BGN_DATE, stormData$BGN_TIME)))
+
+```
+
+
