@@ -15,6 +15,8 @@ output: html_document
 
 library(tidyverse)
 library(lubridate)
+library(stringdist)
+library(ggplot2)
 
 #download data in a tibble
 
@@ -37,14 +39,167 @@ stormData <- as_tibble(read.csv(filename, stringsAsFactors = FALSE))
 
 ## Data Processing
 
-```{r}
+```{r, cache = TRUE}
 
-stormData$BGN_DATE <- as.Date(stormData$BGN_DATE, "%m/%d/%Y")
-stormData$BGN_TIME <- format(strptime(stormData$BGN_TIME, format="%H%M"), format = "%H:%M")
+#select only the variables relevant to determining the greatest economic consiequences and harm to health
+storm <- select(stormData, BGN_DATE, STATE, EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP,CROPDMG, CROPDMGEXP)
+
+storm$BGN_DATE <- as.Date(stormData$BGN_DATE, "%m/%d/%Y")
+#remove events recorded in years when all the weather type were not recorded (prior to 1996)
+storm <- storm[year(storm$BGN_DATE) >= 1996,]
+
+#remove the summary rows (they were all in OK and had no data)
+storm <- storm[!str_detect(storm$EVTYPE, "^Summary"),]
+
+##CLEANING UP EVTYPE
+
+#remove errors in entry of EVTYPE
+storm$EVTYPE <- str_to_upper(storm$EVTYPE) #make all upper case
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "TSTM", "THUNDERSTORM")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLD", "FLOOD")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "URBAN/SML STREAM", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "/FOREST", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "/MIX", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "THUNDERSTORM WIND/", "")
+
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "EXTREME", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "HIGH", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "DENSE", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "EXCESSIVE", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "STRONG", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "UNSEASONABLY", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "HEAVY", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "RECORD", "")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "WAVE", "")
+
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "LANDSLIDE", "DEBRIS FLOW")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "STORM SURGE$", "STORM SURGE/TIDE")
+
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "GLAZE", "ICE STORM")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "SNOW SQUALL", "WINTER STORM")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "WINTER WEATHER MIX", "WINTER WEATHER")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "WINTRY MIX", "WINTER WEATHER")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "COASTAL FLOODING/EROSION", "FLOOD")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "COASTAL FLOODING", "FLOOD")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "RIVER FLOOD", "FLOOD")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLASH FLOOD", "FLOOD")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "HURRICANE$", "HURRICANE/TYPHOON")
+
+storm$EVTYPE <- str_trim(storm$EVTYPE, side = "both")
+
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "^COLD$", "COLD/WIND CHILL")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "^TYPHOON", "HURRICANE/TYPHOON")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FREEZE$", "FROST/FREEZE")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FROST/FROST/FREEZE", "FROST/FREEZE")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLOODING$", "FLOOD")
+storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLOOD$", "FLOOD")
 
 
-#stormData <- mutate(stormData, dateTime = ymd_hm(paste(stormData$BGN_DATE, stormData$BGN_TIME)))
+#all of the 48 official EVTYPE codes
+EVcodes <- c("Astronomical Low Tide", "Avalanche", "Blizzard", "Coastal Flood", "Cold/Wind Chill",
+             "Debris Flow", "Dense Fog", "Dense Smoke", "Drought", "Dust Devil", "Dust Storm", 
+             "Excessive Heat", "Extreme Cold/Wind Chill", "Flash Flood", "Flood", "Frost/Freeze", 
+             "Funnel Cloud", "Freezing Fog", "Hail", "Heat", "Heavy Rain", "Heavy Snow", "High Surf",
+             "High Wind", "Hurricane (Typhoon)", "Ice Storm", "Lake-Effect Snow", "Lakeshore Flood", 
+             "Lightning", "Marine Hail", "Marine High Wind", "Marine Strong Wind", 
+             "Marine Thunderstorm Wind", "Rip Current", "Seiche", "Sleet", "Storm Surge/Tide", 
+             "Strong Wind", "Thunderstorm Wind", "Tornado", "Tropical Depression", "Tropical Storm",
+             "Tsunami", "Volcanic Ash", "Waterspout", "Wildfire", "Winter Storm", "Winter Weather") 
+EVcodes <- str_to_upper(EVcodes)
+EVcodes <- str_replace_all(EVcodes, "EXTREME", "")
+EVcodes <- str_replace_all(EVcodes, "HIGH", "")
+EVcodes <- str_replace_all(EVcodes, "DENSE", "")
+EVcodes <- str_replace_all(EVcodes, "EXCESSIVE", "")
+EVcodes <- str_replace_all(EVcodes, "STRONG", "")
+EVcodes <- str_replace_all(EVcodes, "HEAVY", "") 
+EVcodes <- str_replace_all(EVcodes, " \\(TYPHOON\\)", "/TYPHOON") 
+EVcodes <- str_replace_all(EVcodes, "HEAVY", "")
+EVcodes <- str_trim(EVcodes, side = "both")
+
+storm <- mutate(storm, EVTYPE1 = EVcodes[amatch(storm$EVTYPE, EVcodes, maxDist = 1)])
+
+howmany <- count(storm, EVTYPE, EVTYPE1, sort = TRUE)
+
+tops <- mutate(howmany, fixed = match(howmany$EVTYPE, EVcodes))
+tops <- tops[is.na(tops$fixed),] %>%
+        mutate(percent = n / 902297)
+
+#fraction of records without a matched EVTYPE
+unassigned <- mean(is.na(storm$EVTYPE1))
+```
+
+## cleaning up property damage and crop damage
+
+```{r, cache = TRUE}
+# fixed multipliers for propdmexp
+storm$PROPDMGEXP <- str_replace_all(storm$PROPDMGEXP, "K", "1000")
+storm$PROPDMGEXP <- str_replace_all(storm$PROPDMGEXP, "M", "1000000")
+storm$PROPDMGEXP <- str_replace_all(storm$PROPDMGEXP, "B", "1000000000")
+storm$PROPDMGEXP <- as.integer(storm$PROPDMGEXP)
+storm$PROPDMGEXP[is.na(storm$PROPDMGEXP)] <- 1
+        
+storm$CROPDMGEXP <- str_replace_all(storm$CROPDMGEXP, "K", "1000")
+storm$CROPDMGEXP <- str_replace_all(storm$CROPDMGEXP, "M", "1000000")
+storm$CROPDMGEXP <- str_replace_all(storm$CROPDMGEXP, "B", "1000000000")
+storm$CROPDMGEXP <- as.integer(storm$CROPDMGEXP)
+storm$CROPDMGEXP[is.na(storm$CROPDMGEXP)] <- 1
+
+# calculate the property damage and crop damage for each event
+storm <- mutate(storm, PropertyDamage = PROPDMG * PROPDMGEXP) %>%
+        mutate(CropDamage = CROPDMG * CROPDMGEXP) %>%
+        mutate(TotalDamage = PropertyDamage + CropDamage) %>%
+        select(BGN_DATE, EVTYPE, EVTYPE1, FATALITIES, INJURIES, PropertyDamage, CropDamage, TotalDamage, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP)
 
 ```
 
 
+
+
+## Data exploration
+
+```{r, cache = TRUE}
+
+stormCat <- storm[!is.na(storm$EVTYPE1),]
+
+FatalSum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(totalDeaths = sum(FATALITIES)) %>%
+        arrange(desc(totalDeaths))
+
+InjurySum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(totalInjuries = sum(INJURIES)) %>%
+        arrange(desc(totalInjuries))
+
+HarmSum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(totalInjuries = sum(INJURIES), totalDeaths = sum(FATALITIES)) %>%
+        arrange(desc(totalInjuries))
+
+PropSum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(totalPropDamage = sum(PropertyDamage)) %>%
+        arrange(desc(totalPropDamage))
+        
+CropSum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(totalCropDamage = sum(CropDamage)) %>%
+        arrange(desc(totalCropDamage))
+
+TotalSum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(TotalDamage = sum(TotalDamage), 
+                  totalCropDamage = sum(CropDamage), 
+                  totalPropDamage = sum(PropertyDamage)) %>%
+        arrange(desc(TotalDamage))
+
+```
+
+Data visualization
+
+```{r, cache = TRUE}
+
+e <- ggplot(data = HarmSum, aes(x=totalInjuries, y=totalDeaths, label=EVTYPE1)) + 
+        geom_point() + 
+        #scale_x_log10() + scale_y_log10() + 
+        geom_text(aes(label=EVTYPE1), hjust = 1, vjust = 1, check_overlap = TRUE)
+
+f <- ggplot(data = TotalSum, aes(x = reorder(EVTYPE1, TotalDamage), y = TotalDamage)) + 
+        geom_col() +
+        coord_flip()
+
+```
