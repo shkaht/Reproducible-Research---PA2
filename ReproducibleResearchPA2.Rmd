@@ -206,7 +206,9 @@ plot(chart1)
 
 Next, total economic damage is analyzed by summarizing the cost of property damage and crop damage for each event type.  Because both are in dollar (\$) terms, they can be added together to calculate a total damage cost.  A summary table of the event types causing a total of over \$1 Billion in damage is shown below. 
 
-```{r}
+```{r, cache = TRUE}
+
+
 #create a summary table with total damage, and its two components
 TotalSum <- group_by(stormCat, EVTYPE1) %>%
         summarise(TotalDamage = sum(TotalDamage), 
@@ -248,4 +250,4 @@ plot(chart2)
 
 # Closing
 
-This analysis provide a starting point for understanding the impact of several weather in both human and economic terms.  While it must be noted that many discretionary decisions were made in the cleaning and recoding of event type data to improve the clarity of the analysis and results, many alternate interpretations of the data could be reached leading to diferences in findings.  With that said, this analysis provide evidence that the **heat** and **tornadoes** are the leading causes of human harm, and **floods** and **hurricane/typhoons** cause the greatest economic impact. 
+This analysis provides a starting point for understanding the impact of several weather in both human and economic terms.  While it must be noted that many discretionary decisions were made in the cleaning and recoding of event type data to improve the clarity of the analysis and results, many alternate interpretations of the data could be reached leading to diferences in findings.  With that said, this analysis provide evidence that the **heat** and **tornadoes** are the leading causes of human harm, and **floods** and **hurricane/typhoons** cause the greatest economic impact. 
