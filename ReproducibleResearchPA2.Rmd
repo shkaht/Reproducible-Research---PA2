@@ -5,7 +5,7 @@ date: "February 22, 2019"
 output: html_document
 ---
 
-# Synopsis
+## Synopsis
 
 This data analysis uses the NOAA Storm Database to addresses two fundamental questions about severe weather events: **Across the US, which types of events are most harmful with respect to human health? And which type of events have the greatest economic consequences?**
 
@@ -13,9 +13,9 @@ The analysis is fully reproducible, beginning with the downloading and reading o
 
 The end result is a quantified and visual comparison of the human and economic damage inflicted by severe weather event types with **heat and tornadoes** causing the greatest human impact, and **floods and hurricanes** causing the most economic impact.  
 
-# Data Processing
+## Data Processing
 
-First, the appropriate packages are loaded and the raw data is read into a tibble. 
+First, the appropriate packages are loaded and the raw data is read into a tibble. The raw data format is shown for reference.  
 ```{r, echo = TRUE, cache = TRUE}
 
 #load necessary packages
@@ -39,6 +39,8 @@ if (!file.exists(filename)){
 }
 
 stormData <- as_tibble(read.csv(filename, stringsAsFactors = FALSE))
+
+print(stormData)
 
 ```
 
@@ -133,7 +135,7 @@ storm <- mutate(storm, EVTYPE1 = EVcodes[amatch(storm$EVTYPE, EVcodes, maxDist =
 #fraction of records without a matched EVTYPE
 unassigned <- mean(is.na(storm$EVTYPE1))
 ```
-Out of the `r nrow(storm)` records included in the analysis, `r mean(is.na(storm$EVTYPE1))` do not have a matched event name.  Effort was also made to ensure that those few events were not some of the largest impact events.  Those event names with errors affecting jsut a small numbe rof records, but a large impact were recoded.   
+Out of the `r nrow(storm)` records included in the analysis, `r mean(is.na(storm$EVTYPE1))*100` percent do not have a matched event name.  Effort was also made to ensure that those few events were not some of the largest impact events.  Those event names with errors affecting jsut a small numbe rof records, but a large impact were recoded.   
 
 The final cleaning step is to calculate the dollar ($) value of the economic impact of events where multipliers are located in separate columns. 
 ```{r, cache = TRUE}
@@ -159,7 +161,7 @@ storm <- mutate(storm, PropertyDamage = PROPDMG * PROPDMGEXP) %>%
 
 ```
 
-# Results 
+## Results 
 
 First, the weather events with the greatest impact to human health are examined. The impact of the events is ordered by most fatalities, and also notes number of injuries.    
 ```{r, cache = TRUE}
@@ -182,9 +184,9 @@ The 3 event types that have the greatest impact on human health are **heat, torn
 Chart 1 identifies both injuries and fatalities by event type on the x and y axes.
 ```{r, cache = TRUE}
 
-e <- ggplot(data = HarmSum, aes(x=totalInjuries, y=totalDeaths, label=EVTYPE1)) + 
+chart1 <- ggplot(data = HarmSum, 
+                 aes(x=totalInjuries, y=totalDeaths, label=EVTYPE1)) + 
         geom_point() + 
-        #scale_x_log10() + scale_y_log10() + 
         geom_text(data=subset(HarmSum,
                               totalInjuries > 2500 | totalDeaths > 250),
                   aes(label=EVTYPE1), 
@@ -193,50 +195,57 @@ e <- ggplot(data = HarmSum, aes(x=totalInjuries, y=totalDeaths, label=EVTYPE1)) 
                   check_overlap = TRUE,
                   size = 3) +
         coord_cartesian(xlim = c(0,25000)) +
-        labs(x = "Total Human Injuries", y = "Total Human Deaths", title = "Chart 1: Events that cause the greatest human harm (1996-2011") +
+        labs(x = "Total Human Injuries", 
+             y = "Total Human Deaths", 
+             title = "Chart 1: Greatest human harm by event type ('96-'11)") +
         theme_minimal()
 
-plot(e)
+plot(chart1)
 
 ```
 
+Next, total economic damage is analyzed by summarizing the cost of property damage and crop damage for each event type.  Because both are in dollar (\$) terms, they can be added together to calculate a total damage cost.  A summary table of the event types causing a total of over \$1 Billion in damage is shown below. 
 
-
-```{r, cache = TRUE}
+```{r}
+#create a summary table with total damage, and its two components
 TotalSum <- group_by(stormCat, EVTYPE1) %>%
         summarise(TotalDamage = sum(TotalDamage), 
                   totalCropDamage = sum(CropDamage), 
                   totalPropDamage = sum(PropertyDamage)) %>%
         arrange(desc(TotalDamage)) %>%
         filter(TotalDamage > 1000000000)
-        
+
+print(TotalSum)
+
+#gather the data into a tidy table for plotting      
 tidyDamage <- select(TotalSum, EVTYPE1, totalCropDamage, totalPropDamage) %>%
 gather(damageType, cost, 2:3)
-         
 
 ```
+**Floods** are clearly the most impactful severe weather events.  Note that several different types of floods have been combined given that certain entries, such as "river flood" are not an official event type, but if they are added to general flooding, then it is only logical to also add "coastal" and "flash" flooding to this general flood category.  While drought causes the most crop damage, the total value is much less than that of flooding, hurricanes/typhoons, storm surge, etc.
 
-Data visualization
+Chart 2 highlights the total economic damage of the top severe weather event types while also identifying the prortion of damage resulting from property or crop impacts by color.
+```{r}
+    
 
-```{r, cache = TRUE}
-
-
-
-f <- ggplot(data = TotalSum[TotalSum$TotalDamage > 1000000000,], aes(x = reorder(EVTYPE1, TotalDamage), y = TotalDamage)) + 
-        geom_col() +
-        coord_flip()
-        
-g <- ggplot(data = tidyDamage[tidyDamage$cost > 1000000000,], 
-        aes(x = reorder(EVTYPE1, cost), y = cost)) + 
-        geom_col() +
-        coord_flip()       
-
-h <- ggplot(tidyDamage, aes(x=reorder(EVTYPE1, cost), y=cost/1000000000, fill = damageType)) +
+chart2 <- ggplot(tidyDamage, 
+                 aes(x=reorder(EVTYPE1, cost), 
+                     y=cost/1000000000, 
+                     fill = damageType)) +
         geom_col(color = "black") +
         coord_flip() + 
-        labs(y = "Total Damage ($B)", x = "Type of Event", title = "Events that cause the greatest economic damage (1996-2011") +
-        scale_fill_discrete(name = "Type of damage", labels = c("Crop loss", "Property loss"), direction = -1, l = 75) +
+        labs(y = "Total Damage ($B)", 
+             x = "Type of Event", 
+             title = "Chart 2: Greatest economic damage by event type ('96-'11)") +
+        scale_fill_discrete(name = "Type of damage", 
+                            labels = c("Crop loss", "Property loss"), 
+                            direction = -1, l = 75) +
         theme_minimal()
-        
+
+plot(chart2)
 
 ```
+
+# Closing
+
+This analysis provide a starting point for understanding the impact of several weather in both human and economic terms.  While it must be noted that many discretionary decisions were made in the cleaning and recoding of event type data to improve the clarity of the analysis and results, many alternate interpretations of the data could be reached leading to diferences in findings.  With that said, this analysis provide evidence that the **heat** and **tornadoes** are the leading causes of human harm, and **floods** and **hurricane/typhoons** cause the greatest economic impact. 
