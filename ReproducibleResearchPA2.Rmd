@@ -1,17 +1,24 @@
 ---
-title: "Reproduceable Research PA2"
+title: "Quantifying the Economic Damage and Human Harm of Severe Weather"
 author: "Scott Dayer"
-date: "February 8, 2019"
+date: "February 22, 2019"
 output: html_document
 ---
 
-## SYNOPSIS
+# Synopsis
 
-[10 sentence summary of my analysis here]
+This data analysis uses the NOAA Storm Database to addresses two fundamental questions about severe weather events: **Across the US, which types of events are most harmful with respect to human health? And which type of events have the greatest economic consequences?**
 
+The analysis is fully reproducible, beginning with the downloading and reading of the raw NOAA storm data csv file, in a bz2 zip format.  Next, the data is processed by removing variables that are unnecessary for the analysis, formatting certain fields, and subsetting the data to cover the period of 1996 (when all event types were first recorded) to 2011 (most recent data in the file), when all event types were.  Significant effort is spent cleaning the EVTYPE values to match names of the most recent storm data event table.  The EVTYPE values are further condensed to remove distinction between ambiguous qualifiers to provide a clearer picture of the type of events causing the most damage.  
 
+The end result is a quantified and visual comparison of the human and economic damage inflicted by severe weather event types with **heat and tornadoes** causing the greatest human impact, and **floods and hurricanes** causing the most economic impact.  
 
-```{r, cache = TRUE}
+# Data Processing
+
+First, the appropriate packages are loaded and the raw data is read into a tibble. 
+```{r, echo = TRUE, cache = TRUE}
+
+#load necessary packages
 
 library(tidyverse)
 library(lubridate)
@@ -28,7 +35,6 @@ filename <- "stormData.csv.bz2"
 
 if (!file.exists(filename)){
         url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
-        
         download.file(url, filename)
 }
 
@@ -36,15 +42,15 @@ stormData <- as_tibble(read.csv(filename, stringsAsFactors = FALSE))
 
 ```
 
+Then, significant effort is placed on cleaning the data so that records are matched in an efficient and logical manner.  
+```{r, echo = TRUE, cache = TRUE}
 
-## Data Processing
-
-```{r, cache = TRUE}
-
-#select only the variables relevant to determining the greatest economic consiequences and harm to health
+#select only the variables relevant to determining the greatest economic consequences and harm to health
 storm <- select(stormData, BGN_DATE, STATE, EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP,CROPDMG, CROPDMGEXP)
 
+#format dates as a date class
 storm$BGN_DATE <- as.Date(stormData$BGN_DATE, "%m/%d/%Y")
+
 #remove events recorded in years when all the weather type were not recorded (prior to 1996)
 storm <- storm[year(storm$BGN_DATE) >= 1996,]
 
@@ -53,7 +59,7 @@ storm <- storm[!str_detect(storm$EVTYPE, "^Summary"),]
 
 ##CLEANING UP EVTYPE
 
-#remove errors in entry of EVTYPE
+#remove errors in entry of EVTYPE, such as abbreviations and extra info
 storm$EVTYPE <- str_to_upper(storm$EVTYPE) #make all upper case
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "TSTM", "THUNDERSTORM")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLD", "FLOOD")
@@ -62,6 +68,7 @@ storm$EVTYPE <- str_replace_all(storm$EVTYPE, "/FOREST", "")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "/MIX", "")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "THUNDERSTORM WIND/", "")
 
+#remove ambiguous qualifiers that result in separation of similar events
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "EXTREME", "")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "HIGH", "")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "DENSE", "")
@@ -72,9 +79,9 @@ storm$EVTYPE <- str_replace_all(storm$EVTYPE, "HEAVY", "")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "RECORD", "")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "WAVE", "")
 
+#recode certain events to match more appropriate and general EVTYPES
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "LANDSLIDE", "DEBRIS FLOW")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "STORM SURGE$", "STORM SURGE/TIDE")
-
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "GLAZE", "ICE STORM")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "SNOW SQUALL", "WINTER STORM")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "WINTER WEATHER MIX", "WINTER WEATHER")
@@ -85,8 +92,10 @@ storm$EVTYPE <- str_replace_all(storm$EVTYPE, "RIVER FLOOD", "FLOOD")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLASH FLOOD", "FLOOD")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "HURRICANE$", "HURRICANE/TYPHOON")
 
+#remove extra spaces from both sides of the character string
 storm$EVTYPE <- str_trim(storm$EVTYPE, side = "both")
 
+#adjust certain ending or beginning words the inappropriately separate groups
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "^COLD$", "COLD/WIND CHILL")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "^TYPHOON", "HURRICANE/TYPHOON")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FREEZE$", "FROST/FREEZE")
@@ -95,7 +104,7 @@ storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLOODING$", "FLOOD")
 storm$EVTYPE <- str_replace_all(storm$EVTYPE, "FLOOD$", "FLOOD")
 
 
-#all of the 48 official EVTYPE codes
+#load all of the 48 official EVTYPE codes 
 EVcodes <- c("Astronomical Low Tide", "Avalanche", "Blizzard", "Coastal Flood", "Cold/Wind Chill",
              "Debris Flow", "Dense Fog", "Dense Smoke", "Drought", "Dust Devil", "Dust Storm", 
              "Excessive Heat", "Extreme Cold/Wind Chill", "Flash Flood", "Flood", "Frost/Freeze", 
@@ -105,6 +114,8 @@ EVcodes <- c("Astronomical Low Tide", "Avalanche", "Blizzard", "Coastal Flood", 
              "Marine Thunderstorm Wind", "Rip Current", "Seiche", "Sleet", "Storm Surge/Tide", 
              "Strong Wind", "Thunderstorm Wind", "Tornado", "Tropical Depression", "Tropical Storm",
              "Tsunami", "Volcanic Ash", "Waterspout", "Wildfire", "Winter Storm", "Winter Weather") 
+
+#remove ambiguous qualifiers from the official EVTYPES to group like events
 EVcodes <- str_to_upper(EVcodes)
 EVcodes <- str_replace_all(EVcodes, "EXTREME", "")
 EVcodes <- str_replace_all(EVcodes, "HIGH", "")
@@ -116,28 +127,24 @@ EVcodes <- str_replace_all(EVcodes, " \\(TYPHOON\\)", "/TYPHOON")
 EVcodes <- str_replace_all(EVcodes, "HEAVY", "")
 EVcodes <- str_trim(EVcodes, side = "both")
 
+#create a separate field that matches the processed EVTYPES to the official EV codes, including those that almost match
 storm <- mutate(storm, EVTYPE1 = EVcodes[amatch(storm$EVTYPE, EVcodes, maxDist = 1)])
-
-howmany <- count(storm, EVTYPE, EVTYPE1, sort = TRUE)
-
-tops <- mutate(howmany, fixed = match(howmany$EVTYPE, EVcodes))
-tops <- tops[is.na(tops$fixed),] %>%
-        mutate(percent = n / 902297)
 
 #fraction of records without a matched EVTYPE
 unassigned <- mean(is.na(storm$EVTYPE1))
 ```
+Out of the `r nrow(storm)` records included in the analysis, `r mean(is.na(storm$EVTYPE1))` do not have a matched event name.  Effort was also made to ensure that those few events were not some of the largest impact events.  Those event names with errors affecting jsut a small numbe rof records, but a large impact were recoded.   
 
-## cleaning up property damage and crop damage
-
+The final cleaning step is to calculate the dollar ($) value of the economic impact of events where multipliers are located in separate columns. 
 ```{r, cache = TRUE}
-# fixed multipliers for propdmexp
+# replace multipliers in propdmexp with numeric values
 storm$PROPDMGEXP <- str_replace_all(storm$PROPDMGEXP, "K", "1000")
 storm$PROPDMGEXP <- str_replace_all(storm$PROPDMGEXP, "M", "1000000")
 storm$PROPDMGEXP <- str_replace_all(storm$PROPDMGEXP, "B", "1000000000")
 storm$PROPDMGEXP <- as.integer(storm$PROPDMGEXP)
 storm$PROPDMGEXP[is.na(storm$PROPDMGEXP)] <- 1
-        
+
+# replace multipliers in cropdmexp with numeric values        
 storm$CROPDMGEXP <- str_replace_all(storm$CROPDMGEXP, "K", "1000")
 storm$CROPDMGEXP <- str_replace_all(storm$CROPDMGEXP, "M", "1000000")
 storm$CROPDMGEXP <- str_replace_all(storm$CROPDMGEXP, "B", "1000000000")
@@ -152,40 +159,60 @@ storm <- mutate(storm, PropertyDamage = PROPDMG * PROPDMGEXP) %>%
 
 ```
 
+# Results 
 
-
-
-## Data exploration
-
+First, the weather events with the greatest impact to human health are examined. The impact of the events is ordered by most fatalities, and also notes number of injuries.    
 ```{r, cache = TRUE}
 
+#remove measurements with no matching event type after all cleaning efforts
 stormCat <- storm[!is.na(storm$EVTYPE1),]
 
-FatalSum <- group_by(stormCat, EVTYPE1) %>%
-        summarise(totalDeaths = sum(FATALITIES)) %>%
+#create a table with that summarizes total deaths and injuries for each event type and sort by deaths from most to least
+HarmSum <- group_by(stormCat, EVTYPE1) %>%
+        summarise(totalDeaths = sum(FATALITIES), 
+                  totalInjuries = sum(INJURIES)) %>%
         arrange(desc(totalDeaths))
 
-InjurySum <- group_by(stormCat, EVTYPE1) %>%
-        summarise(totalInjuries = sum(INJURIES)) %>%
-        arrange(desc(totalInjuries))
+#print the top 15 events in terms of fatalities, showing associated injuries
+print(HarmSum[1:15,])
 
-HarmSum <- group_by(stormCat, EVTYPE1) %>%
-        summarise(totalInjuries = sum(INJURIES), totalDeaths = sum(FATALITIES)) %>%
-        arrange(desc(totalInjuries))
+```
+The 3 event types that have the greatest impact on human health are **heat, tornado, and flood** for both injuries and fatalities.  **heat** is the #1 cause of death.  It should be noted that this includes both "excessive heat" and "heat" from the official NOAA Event Table, and the decision to combine these is due to the ambiguous difference in naming. If an event of heat is classified as a severe event and results in deaths, it certainly could be considered excessive, whether explicit in name or not.
 
-PropSum <- group_by(stormCat, EVTYPE1) %>%
-        summarise(totalPropDamage = sum(PropertyDamage)) %>%
-        arrange(desc(totalPropDamage))
-        
-CropSum <- group_by(stormCat, EVTYPE1) %>%
-        summarise(totalCropDamage = sum(CropDamage)) %>%
-        arrange(desc(totalCropDamage))
+Chart 1 identifies both injuries and fatalities by event type on the x and y axes.
+```{r, cache = TRUE}
 
+e <- ggplot(data = HarmSum, aes(x=totalInjuries, y=totalDeaths, label=EVTYPE1)) + 
+        geom_point() + 
+        #scale_x_log10() + scale_y_log10() + 
+        geom_text(data=subset(HarmSum,
+                              totalInjuries > 2500 | totalDeaths > 250),
+                  aes(label=EVTYPE1), 
+                  hjust = -.1, 
+                  vjust = -.5, 
+                  check_overlap = TRUE,
+                  size = 3) +
+        coord_cartesian(xlim = c(0,25000)) +
+        labs(x = "Total Human Injuries", y = "Total Human Deaths", title = "Chart 1: Events that cause the greatest human harm (1996-2011") +
+        theme_minimal()
+
+plot(e)
+
+```
+
+
+
+```{r, cache = TRUE}
 TotalSum <- group_by(stormCat, EVTYPE1) %>%
         summarise(TotalDamage = sum(TotalDamage), 
                   totalCropDamage = sum(CropDamage), 
                   totalPropDamage = sum(PropertyDamage)) %>%
-        arrange(desc(TotalDamage))
+        arrange(desc(TotalDamage)) %>%
+        filter(TotalDamage > 1000000000)
+        
+tidyDamage <- select(TotalSum, EVTYPE1, totalCropDamage, totalPropDamage) %>%
+gather(damageType, cost, 2:3)
+         
 
 ```
 
@@ -193,13 +220,23 @@ Data visualization
 
 ```{r, cache = TRUE}
 
-e <- ggplot(data = HarmSum, aes(x=totalInjuries, y=totalDeaths, label=EVTYPE1)) + 
-        geom_point() + 
-        #scale_x_log10() + scale_y_log10() + 
-        geom_text(aes(label=EVTYPE1), hjust = 1, vjust = 1, check_overlap = TRUE)
 
-f <- ggplot(data = TotalSum, aes(x = reorder(EVTYPE1, TotalDamage), y = TotalDamage)) + 
+
+f <- ggplot(data = TotalSum[TotalSum$TotalDamage > 1000000000,], aes(x = reorder(EVTYPE1, TotalDamage), y = TotalDamage)) + 
         geom_col() +
         coord_flip()
+        
+g <- ggplot(data = tidyDamage[tidyDamage$cost > 1000000000,], 
+        aes(x = reorder(EVTYPE1, cost), y = cost)) + 
+        geom_col() +
+        coord_flip()       
+
+h <- ggplot(tidyDamage, aes(x=reorder(EVTYPE1, cost), y=cost/1000000000, fill = damageType)) +
+        geom_col(color = "black") +
+        coord_flip() + 
+        labs(y = "Total Damage ($B)", x = "Type of Event", title = "Events that cause the greatest economic damage (1996-2011") +
+        scale_fill_discrete(name = "Type of damage", labels = c("Crop loss", "Property loss"), direction = -1, l = 75) +
+        theme_minimal()
+        
 
 ```
